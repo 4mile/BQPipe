@@ -1,0 +1,4 @@
+experiment_name,account_id,prediction,is_active
+first experiment,323,13.23425,True
+cool_test,23,3.04,False
+facebook AB test,32302,0.235140,True
