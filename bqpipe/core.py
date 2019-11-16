@@ -1,13 +1,52 @@
 import datetime
 import logging
 import os
-import sys
-import numpy as np
 import pandas as pd
 from google.cloud import bigquery
 from google.cloud.exceptions import BadRequest, NotFound
+from . import helpers
 
-logging.basicConfig(level='WARNING')
+logging.basicConfig(level='INFO')
+
+
+def list_datasets() -> list:
+    """Return list of all dataset names as strings for your authenticated project."""
+    bigquery_client = bigquery.Client()
+    project = bigquery_client.project
+    datasets = list(bigquery_client.list_datasets())
+    dataset_list = []
+
+    if datasets:
+        for dataset in datasets:  # API request(s)
+            dataset_list.append(dataset.dataset_id)
+    else:
+        logging.info("{} project does not contain any datasets.".format(project))
+
+    return dataset_list
+
+
+def list_tables_in_dataset(dataset: str) -> list:
+    # try:
+    bigquery_client = bigquery.Client()
+    list_tables_sql = """
+      SELECT table_name
+      FROM   {}.INFORMATION_SCHEMA.TABLES
+    """.format(dataset)
+    query_job = bigquery_client.query(list_tables_sql)
+    result = query_job.result()
+
+    # except NotFound as not_found_error:
+    #     logging.error('One of the SQL objects specified in your query does not exist. Please review and confirm all\n'
+    #                   'tables in the query are spelled correctly with their correct dataset specified.\nRef: {}'.format(
+    #                     not_found_error))
+    # except BadRequest as bad_request_error:
+    #     logging.error('Input SQL is invalid, please review and confirm your SQL is valid. Ref: {}.'.format(
+    #                     bad_request_error))
+
+
+def get_table_schema(dataset, table):
+    """Retrieve list of dictionaries representing the schema of given dataset.table."""
+    pass
 
 
 def fetch_from_bigquery(table: str, fields: tuple = '*', dataset='analytics') -> pd.DataFrame:
@@ -89,14 +128,14 @@ def write_to_bigquery(dataframe: pd.DataFrame, destination_table: str,
     table_already_exists = True
     new_table_schema = []
 
-    if not _does_table_exist(bigquery_client, destination_table):
+    if not helpers.does_table_exist(bigquery_client, destination_table):
         table_already_exists = False
         if create_table_if_missing:
             logging.info('Creating missing specified table output "{}" in Dataset "{}" as '
                          'create_if_missing was set to True'.format(destination_table, destination_dataset))
             if custom_new_table_schema is not None:
                 logging.info('Creating table with user-specified custom schema.')
-                new_table_schema = _get_detected_schema(dataframe, tuple(custom_new_table_schema))
+                new_table_schema = helpers.get_detected_schema(dataframe, tuple(custom_new_table_schema))
             else:
                 logging.info('Creating table without specified schema; auto-detecting schema to append table.')
         else:
@@ -138,57 +177,6 @@ def write_to_bigquery(dataframe: pd.DataFrame, destination_table: str,
     if load_job.error_result:
         raise RuntimeError(load_job.errors)
     return load_response
-
-
-def _does_table_exist(bigquery_client: bigquery.Client, table: str, dataset: str = 'analytics') -> bool:
-    """Check if given table from given Dataset exists in BigQuery, return True if so."""
-    try:
-        table_reference = bigquery_client.dataset(dataset).table(table)
-        is_table = bigquery_client.get_table(table_reference)
-        if is_table:
-            logging.info('Table "{}" in Dataset "{}" already exists in BigQuery.'.format(table, dataset))
-            return True
-    except NotFound as error:
-        logging.warning('Table "{}" does not exist in BigQuery Dataset "{}". Ref: {}.'.format(table, dataset, error))
-        return False
-
-
-def _get_detected_schema(dataframe: pd.DataFrame, custom_schema: tuple = None) -> tuple:
-    """Return tuple of dictionaries with detected schema (auto-detect if custom_schema not specified)."""
-    output_schema = []
-    field_names = []
-    if custom_schema:
-        for schema in custom_schema:
-            if 'name' not in schema or 'field_type' not in schema:
-                logging.error(
-                    'You have at least one schema column defined without a name or field_type. All columns in\n'
-                    'custom schema must have specified keys "name" and "field_type". Update your custom schema.')
-                sys.exit()
-            if 'mode' not in schema:
-                schema['mode'] = 'NULLABLE'
-            name, f_type, mode = schema['name'].lower(), schema['field_type'].upper(), schema['mode'].upper()
-            if 'description' not in schema:
-                column_schema = bigquery.SchemaField(name, f_type, mode=mode)
-            else:
-                column_schema = bigquery.SchemaField(name, f_type, mode=mode, description=schema['description'])
-            output_schema.append(column_schema)
-            field_names.append(name)
-    else:
-        print(dataframe.head())
-        logging.error("Auto-detect not yet implemented, please specify custom schema.")
-        sys.exit()
-
-    if 'created_at' in field_names:
-        logging.error('You''ve specified a "created_at" field, however, this field is added automatically during\n'
-                      'upload to capture upload to BigQuery time and is a BQPipe system field. Please choose another'
-                      'field name for your field.')
-        sys.exit()
-    else:
-        created_at_schema = bigquery.SchemaField('created_at', 'STRING', mode='REQUIRED',
-                                                 description='Date inserted into BigQuery.')
-        output_schema.append(created_at_schema)
-
-    return tuple(output_schema)
 
 
 if __name__ == '__main__':

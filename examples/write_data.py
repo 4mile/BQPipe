@@ -2,13 +2,14 @@ import os
 import pandas as pd
 import bqpipe
 
+# Authenticate to BQ Project with your credentials.
 os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = '/Users/johnathanbrooks/Downloads/fivetran-better-help-warehouse' \
                                                '-5c0701231749.json'
-# unix_timestamp = round(datetime.datetime.utcnow().timestamp() * 1000)
 
+# Specify data source and destination table.
 csv_data_path = 'sample_experiment_data.csv'
-new_table_name = 'prediction_sample'
-sample_schema = [
+df = pd.read_csv(csv_data_path)
+data_schema = [
     {
         'name': 'experiment_name',
         'field_type': 'string',
@@ -30,11 +31,9 @@ sample_schema = [
     }
 ]
 
-df = pd.read_csv(csv_data_path)
+# Specify BigQuery destination table.
+destination_table = 'prediction_sample'
 
-# bqpipe.write_to_bigquery(df, new_table_name, create_table_if_missing=True, custom_new_table_schema=sample_schema,
-#                          insert_type='Truncate')
-
-sample_sql = 'SELECT 1 FROM analytics.prediction_sample2'
-output_df = bqpipe.fetch_sql_output_bigquery(sample_sql)
-print(output_df)
+# Write to BigQuery.
+bqpipe.write_to_bigquery(df, destination_table, create_table_if_missing=True, custom_new_table_schema=data_schema,
+                         insert_type='Truncate')
