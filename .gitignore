@@ -86,6 +86,7 @@ ENV/
 # Spyder project settings
 .spyderproject
 .idea/
+.DS_Store
 
 # Rope project settings
 .ropeproject
