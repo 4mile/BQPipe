@@ -32,8 +32,8 @@ data_schema = [
 ]
 
 # Specify BigQuery destination table.
-destination_table = 'prediction_sample'
+destination_table = 'Prediction_sample'
 
 # Write to BigQuery.
 bqpipe.write_to_bigquery(df, destination_table, create_table_if_missing=True, custom_new_table_schema=data_schema,
-                         insert_type='Truncate')
+                         insert_type='append')
