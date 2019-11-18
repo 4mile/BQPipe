@@ -23,7 +23,7 @@ df3 = bqpipe.fetch_table_data(source_table, where_clause=where_clause)
 print(df3)
 
 # Another example: Choose Selected fields, Where clause and row limit.
-select_fields = ('* EXCEPT (created_at)')
+select_fields = '* EXCEPT (created_at)'
 where_sql = "is_active = True AND prediction < 1"
 rows = 1
 df4 = bqpipe.fetch_table_data(source_table, fields=select_fields, where_clause=where_sql, number_of_rows=rows)

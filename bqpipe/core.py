@@ -1,12 +1,9 @@
 import datetime
 import logging
-import os
 import pandas as pd
 from google.cloud import bigquery
 from google.cloud.exceptions import BadRequest, NotFound
 from . import helpers
-
-logging.basicConfig(level='INFO')
 
 
 def list_datasets() -> list:
@@ -27,13 +24,14 @@ def list_datasets() -> list:
 
 def list_tables_in_dataset(dataset: str) -> pd.DataFrame:
     """Return list of tables (as strings) in given BigQuery dataset."""
+    list_tables_sql = """
+        SELECT table_name
+        FROM   {}.INFORMATION_SCHEMA.TABLES
+    """.format(dataset)
+    logging.debug('Generated list tables metadata SQL:\n{}.'.format(list_tables_sql))
+
     try:
         bigquery_client = bigquery.Client()
-        list_tables_sql = """
-            SELECT table_name
-            FROM   {}.INFORMATION_SCHEMA.TABLES
-        """.format(dataset)
-        logging.debug('Generated list tables metadata SQL:\n{}.'.format(list_tables_sql))
 
         query_job = bigquery_client.query(list_tables_sql)
         result_df = query_job.to_dataframe()
@@ -47,9 +45,12 @@ def list_tables_in_dataset(dataset: str) -> pd.DataFrame:
     except NotFound as not_found_error:
         logging.error('The dataset you''ve specified was not found for your given credentials. Ref: {}'.format(
                         not_found_error))
+        raise RuntimeError('Dataset {} not found.'.format(dataset))
     except BadRequest as bad_request_error:
-        logging.error('Input SQL is invalid, please review and confirm your input dataset is valid. Ref: {}.'.format(
+        logging.error('Request is invalid, please review and confirm your input dataset is valid. Ref: {}.'.format(
                         bad_request_error))
+        raise ValueError('Request for given dataset "{}" was invalid. Information Schema SQL request: {}'.format(
+            dataset, list_tables_sql))
 
 
 def get_table_schema(dataset: str, table: str) -> list:
@@ -98,23 +99,40 @@ def fetch_table_data(table: str, fields: tuple = '*', where_clause: str = '1 = 1
     Returns:
         Pandas DataFrame representing the query output.
     """
-    bigquery_client = bigquery.Client()
-    if isinstance(fields, tuple):
-        select_clause = 'SELECT * ' if fields == '*' else 'SELECT {} '.format(', '.join(tuple(fields)))
-    else:
-        select_clause = 'SELECT * ' if fields == '*' else 'SELECT {} '.format(fields)
-    from_clause = 'FROM {}.{} '.format(dataset, table)
-    limit_clause = '' if number_of_rows < 1 else ' LIMIT {}'.format(number_of_rows)
-    if where_clause[:4].lower() == 'where':
-        where_clause = where_clause + ' '
-    else:
-        where_clause = 'WHERE {} '.format(where_clause)
+    try:
+        bigquery_client = bigquery.Client()
 
-    fetch_table_sql = select_clause + from_clause + where_clause + limit_clause
-    logging.debug('Fetch table generated SQL:\n' + fetch_table_sql)
-    query_job = bigquery_client.query(fetch_table_sql)
+        print(fields)
+        print(len(fields))
+        if isinstance(fields, tuple) and len(fields) > 1:
+            select_clause = 'SELECT * ' if fields == '*' else 'SELECT {} '.format(', '.join(fields))
+        else:
+            select_clause = 'SELECT * ' if fields == '*' else 'SELECT {} '.format(fields)
 
-    return query_job.to_dataframe()
+        from_clause = 'FROM {}.{} '.format(dataset, table)
+        limit_clause = '' if number_of_rows < 1 else ' LIMIT {}'.format(number_of_rows)
+
+        if where_clause[:4].lower() == 'where':
+            where_clause = where_clause + ' '
+        else:
+            where_clause = 'WHERE {} '.format(where_clause)
+
+        fetch_table_sql = select_clause + from_clause + where_clause + limit_clause
+        logging.debug('Fetch table generated SQL:\n' + fetch_table_sql)
+        query_job = bigquery_client.query(fetch_table_sql)
+
+        return query_job.to_dataframe()
+
+    except NotFound as not_found_error:
+        logging.error('One of the objects specified in your query does not exist. Please review and confirm the\n'
+                      'table exists and is spelled correctly with the correct dataset specified.\nRef: {}'.format(
+                        not_found_error))
+        raise RuntimeError('Requested table "{}" in dataset {} not found.'.format(table, dataset))
+    except BadRequest as bad_request_error:
+        logging.error('Your inputs created an invalid SQL request, please review inputs and confirm your SQL is valid.'
+                      'Ref: {}.'.format(bad_request_error))
+        raise ValueError('Request is invalid, confirm inputs formed correctly. Review generated SQL and adjust input '
+                         'parameters accordingly to fix the SQL request.')
 
 
 def fetch_sql_output(sql_select_statement: str) -> pd.DataFrame:
@@ -134,9 +152,12 @@ def fetch_sql_output(sql_select_statement: str) -> pd.DataFrame:
         logging.error('One of the SQL objects specified in your query does not exist. Please review and confirm all\n'
                       'tables in the query are spelled correctly with their correct dataset specified.\nRef: {}'.format(
                         not_found_error))
+        raise RuntimeError('SQL query references object(s) which do not exist, review SQL and confirm all objects '
+                           'exist.')
     except BadRequest as bad_request_error:
         logging.error('Input SQL is invalid, please review and confirm your SQL is valid. Ref: {}.'.format(
                         bad_request_error))
+        raise ValueError('Invalid SQL, review and fix any syntax errors.')
 
 
 def write_to_bigquery(dataframe: pd.DataFrame, destination_table: str,
@@ -212,7 +233,7 @@ def write_to_bigquery(dataframe: pd.DataFrame, destination_table: str,
                           'update the specified table name to an existing table, or set function parameter\n'
                           'create_if_missing to True to create "{dataset}.{table}".'.format(
                             table=destination_table, dataset=destination_dataset))
-            return False, 'Specified table does not exist.'
+            raise ValueError('Specified table "{}" does not exist.'.format(destination_table))
 
     # Add appended created_at column to DataFrame
     dataframe['created_at'] = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
@@ -249,27 +270,3 @@ def write_to_bigquery(dataframe: pd.DataFrame, destination_table: str,
     if load_job.error_result:
         raise RuntimeError(load_job.errors)
     return load_response
-
-
-if __name__ == '__main__':
-    os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = '/Users/johnathanbrooks/Downloads/fivetran-better-help-warehouse' \
-                                                   '-5c0701231749.json'
-
-    sample_csv_path = '../examples/sample_experiment_data.csv'
-    df = pd.read_csv(sample_csv_path)
-
-    sample_schema = [
-        {
-            'name': 'experiment_name',
-            'field_type': 'string',
-            'mode': 'required',
-            'description': 'The name of the experiment'
-        },
-        {
-            'name': 'account_id',
-            'field_type': 'integer'
-        }
-    ]
-
-    write_to_bigquery(df, 'experiment_sample', create_table_if_missing=True,
-                      custom_new_table_schema=sample_schema)

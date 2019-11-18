@@ -4,8 +4,6 @@ import pandas as pd
 from google.cloud import bigquery
 from google.cloud.exceptions import NotFound
 
-logging.basicConfig(level='INFO')
-
 
 def does_table_exist(bigquery_client: bigquery.Client, table: str, dataset: str = 'analytics') -> bool:
     """Check if given table from given Dataset exists in BigQuery, return True if so."""
