@@ -39,9 +39,9 @@ setup(
     keywords='bigquery looker etl data engineering dataframe',
 
     package_dir={'': 'bqpipe'},
-    packages=find_packages(where='bqpipe'),
+    packages=['bqpipe'],
 
-    python_requires='>=3.5, <4',
+    python_requires='>=3.7, <4',
     install_requires=[
         'pandas',
         'google-cloud-bigquery'

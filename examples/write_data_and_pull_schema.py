@@ -19,4 +19,4 @@ data_schema = bqpipe.get_table_schema(destination_dataset, destination_table)
 print(data_schema)
 
 # Write to BigQuery. If dataset not specified, default is the "analytics" dataset.
-bqpipe.write_to_bigquery(df, destination_table, destination_dataset='test_dataset')
+bqpipe.write_to_bigquery(df, destination_table, custom_new_table_schema=data_schema)

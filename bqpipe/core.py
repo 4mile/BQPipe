@@ -1,6 +1,7 @@
 import datetime
 import logging
 import pandas as pd
+from typing import Union
 from google.cloud import bigquery
 from google.cloud.exceptions import BadRequest, NotFound
 from . import helpers
@@ -85,7 +86,7 @@ def get_table_schema(dataset: str, table: str) -> list:
     return dict_output
 
 
-def fetch_table_data(table: str, fields: tuple = '*', where_clause: str = '1 = 1', number_of_rows: int = 0,
+def fetch_table_data(table: str, fields: Union[tuple, str] = '*', where_clause: str = '1 = 1', number_of_rows: int = 0,
                      dataset='analytics') -> pd.DataFrame:
     """Download specified table as Pandas DataFrame from specified BigQuery table.
 
@@ -163,7 +164,7 @@ def fetch_sql_output(sql_select_statement: str) -> pd.DataFrame:
 def write_to_bigquery(dataframe: pd.DataFrame, destination_table: str,
                       insert_type: str = 'append', accept_incomplete_schema: bool = False,
                       create_table_if_missing: bool = False, custom_new_table_schema: list = None,
-                      destination_dataset: str = 'analytics', accept_capital_letters: bool = False) -> tuple:
+                      accept_capital_letters: bool = False) -> tuple:
     """Write data into specified BigQuery destination table, with option to create a new table.
 
     If you would like to create a new table, set create_if_missing to True. By default, the script will autodetect
@@ -195,13 +196,13 @@ def write_to_bigquery(dataframe: pd.DataFrame, destination_table: str,
         create_table_if_missing: Boolean, specify True if the specified table should be created if it doesn't already
                             exist. Default is True (throws error if table doesn't already exist).
         custom_new_table_schema: Tuple of dictionaries representing the schema for a new table (see above for details).
-        destination_dataset: The destination Dataset of the table to create/insert into.
+        # destination_dataset: The destination Dataset of the table to create/insert into.
         accept_capital_letters: Boolean, Set to True if you'd like to work with a table with capital letters. BigQuery
                                 generally stipulates camel_case, so this should generally not be used. Default False.
     Returns:
         Tuple with the response of the table write API request.
     """
-    destination_dataset = destination_dataset.strip()
+    destination_dataset = 'analytics'
     destination_table = destination_table.strip()
     insert_type = insert_type.lower().strip()
     insert_type_acceptable_values = ('append', 'truncate')

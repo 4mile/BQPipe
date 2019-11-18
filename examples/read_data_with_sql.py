@@ -8,7 +8,7 @@ os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = '/Users/johnathanbrooks/Downloads
 # Specify the SQL statement you'd like to execute.
 sql = """
     SELECT  *
-    FROM    analytics.prediction_sample2
+    FROM    analytics.prediction_sample
 """
 
 # Get output as DataFrame.
