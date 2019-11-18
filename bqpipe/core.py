@@ -84,22 +84,40 @@ def get_table_schema(dataset: str, table: str) -> list:
     return dict_output
 
 
-def fetch_from_bigquery(table: str, fields: tuple = '*', dataset='analytics') -> pd.DataFrame:
+def fetch_table_data(table: str, fields: tuple = '*', where_clause: str = '1 = 1', number_of_rows: int = 0,
+                     dataset='analytics') -> pd.DataFrame:
     """Download specified table as Pandas DataFrame from specified BigQuery table.
 
     Args:
         # bigquery_client: The Google Cloud BigQuery client for your Project.
         table: String representing the table source to query.
         fields: Tuple of fields to pull from the table, defaults to all fields.
+        where_clause: String representing a SQL Where clause applied when fetching the data, default is no Where clause.
+        number_of_rows: Integer representing the number of rows to return, default to all rows in table.
         dataset: The Dataset the table is located in.
     Returns:
         Pandas DataFrame representing the query output.
     """
-    print('Not yet implemented. Params: {}, {}, {}.'.format(dataset, table, fields))
-    return pd.DataFrame()
+    bigquery_client = bigquery.Client()
+    if isinstance(fields, tuple):
+        select_clause = 'SELECT * ' if fields == '*' else 'SELECT {} '.format(', '.join(tuple(fields)))
+    else:
+        select_clause = 'SELECT * ' if fields == '*' else 'SELECT {} '.format(fields)
+    from_clause = 'FROM {}.{} '.format(dataset, table)
+    limit_clause = '' if number_of_rows < 1 else ' LIMIT {}'.format(number_of_rows)
+    if where_clause[:4].lower() == 'where':
+        where_clause = where_clause + ' '
+    else:
+        where_clause = 'WHERE {} '.format(where_clause)
+
+    fetch_table_sql = select_clause + from_clause + where_clause + limit_clause
+    logging.debug('Fetch table generated SQL:\n' + fetch_table_sql)
+    query_job = bigquery_client.query(fetch_table_sql)
+
+    return query_job.to_dataframe()
 
 
-def fetch_sql_output_bigquery(sql_select_statement: str) -> pd.DataFrame:
+def fetch_sql_output(sql_select_statement: str) -> pd.DataFrame:
     """Run SQL on BigQuery and fetch output as Pandas DataFrame.
 
     Args:

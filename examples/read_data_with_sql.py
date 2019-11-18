@@ -12,5 +12,5 @@ sql = """
 """
 
 # Get output as DataFrame.
-df = bqpipe.fetch_sql_output_bigquery(sql)
+df = bqpipe.fetch_sql_output(sql)
 print(df)
