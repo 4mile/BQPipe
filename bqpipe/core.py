@@ -7,9 +7,21 @@ from google.cloud.exceptions import BadRequest, NotFound
 from . import helpers
 
 
-def list_datasets() -> list:
+def authenticate_with_service_account_json(json_key_file_path: str) -> bigquery.Client:
+    """Authenticate to Google Cloud BigQuery with a service account JSON key file.
+
+    Args:
+        json_key_file_path: String representing the absolute path to your saved service account JSON key file.
+                            i.e. '/Users/johnathanbrooks/Downloads/fivetran-better-help-warehouse-adcabc123123.json'
+    Returns:
+        Authenticated client used to executed API calls with BigQuery.
+    """
+    logging.debug('Attempting to authenticate with JSON key file at: {}'.format(json_key_file_path))
+    return bigquery.Client.from_service_account_json(json_key_file_path)
+
+
+def list_datasets(bigquery_client: bigquery.Client) -> list:
     """Return list of all dataset names (as strings) for your authenticated project."""
-    bigquery_client = bigquery.Client()
     project = bigquery_client.project
     datasets = list(bigquery_client.list_datasets())
     dataset_list = []
@@ -23,7 +35,7 @@ def list_datasets() -> list:
     return dataset_list
 
 
-def list_tables_in_dataset(dataset: str) -> pd.DataFrame:
+def list_tables_in_dataset(bigquery_client: bigquery.Client, dataset: str) -> pd.DataFrame:
     """Return list of tables (as strings) in given BigQuery dataset."""
     list_tables_sql = """
         SELECT table_name
@@ -32,8 +44,6 @@ def list_tables_in_dataset(dataset: str) -> pd.DataFrame:
     logging.debug('Generated list tables metadata SQL:\n{}.'.format(list_tables_sql))
 
     try:
-        bigquery_client = bigquery.Client()
-
         query_job = bigquery_client.query(list_tables_sql)
         result_df = query_job.to_dataframe()
         list_result = result_df['table_name'].values.tolist()
@@ -54,9 +64,8 @@ def list_tables_in_dataset(dataset: str) -> pd.DataFrame:
             dataset, list_tables_sql))
 
 
-def get_table_schema(dataset: str, table: str) -> list:
+def get_table_schema(bigquery_client: bigquery.Client, dataset: str, table: str) -> list:
     """Retrieve list of dictionaries representing the schema of given table in given dataset."""
-    bigquery_client = bigquery.Client()
     list_table_schema_sql = """
         SELECT  C.column_name, C.data_type, C.is_nullable, CFP.description
         FROM    {dataset_name}.INFORMATION_SCHEMA.COLUMNS C
@@ -86,12 +95,12 @@ def get_table_schema(dataset: str, table: str) -> list:
     return dict_output
 
 
-def fetch_table_data(table: str, fields: Union[tuple, str] = '*', where_clause: str = '1 = 1', number_of_rows: int = 0,
-                     dataset='analytics') -> pd.DataFrame:
+def fetch_table_data(bigquery_client: bigquery.Client, table: str, fields: Union[tuple, str] = '*',
+                     where_clause: str = '1 = 1', number_of_rows: int = 0, dataset='analytics') -> pd.DataFrame:
     """Download specified table as Pandas DataFrame from specified BigQuery table.
 
     Args:
-        # bigquery_client: The Google Cloud BigQuery client for your Project.
+        bigquery_client: The Google Cloud BigQuery client for your Project.
         table: String representing the table source to query.
         fields: Tuple of fields to pull from the table, defaults to all fields.
         where_clause: String representing a SQL Where clause applied when fetching the data, default is no Where clause.
@@ -101,10 +110,6 @@ def fetch_table_data(table: str, fields: Union[tuple, str] = '*', where_clause: 
         Pandas DataFrame representing the query output.
     """
     try:
-        bigquery_client = bigquery.Client()
-
-        print(fields)
-        print(len(fields))
         if isinstance(fields, tuple) and len(fields) > 1:
             select_clause = 'SELECT * ' if fields == '*' else 'SELECT {} '.format(', '.join(fields))
         else:
@@ -136,16 +141,16 @@ def fetch_table_data(table: str, fields: Union[tuple, str] = '*', where_clause: 
                          'parameters accordingly to fix the SQL request.')
 
 
-def fetch_sql_output(sql_select_statement: str) -> pd.DataFrame:
+def fetch_sql_output(bigquery_client: bigquery.Client, sql_select_statement: str) -> pd.DataFrame:
     """Run SQL on BigQuery and fetch output as Pandas DataFrame.
 
     Args:
+        bigquery_client: The Google Cloud BigQuery client for your Project.
         sql_select_statement: String representing the SELECT query to run in BigQuery.
     Returns:
         Pandas DataFrame representing the query output.
     """
     try:
-        bigquery_client = bigquery.Client()
         query_job = bigquery_client.query(sql_select_statement)
 
         return query_job.to_dataframe()
@@ -161,7 +166,7 @@ def fetch_sql_output(sql_select_statement: str) -> pd.DataFrame:
         raise ValueError('Invalid SQL, review and fix any syntax errors.')
 
 
-def write_to_bigquery(dataframe: pd.DataFrame, destination_table: str,
+def write_to_bigquery(bigquery_client: bigquery.Client, dataframe: pd.DataFrame, destination_table: str,
                       insert_type: str = 'append', accept_incomplete_schema: bool = False,
                       create_table_if_missing: bool = False, custom_new_table_schema: list = None,
                       accept_capital_letters: bool = False) -> tuple:
@@ -187,7 +192,7 @@ def write_to_bigquery(dataframe: pd.DataFrame, destination_table: str,
     ]
 
     Args:
-        # bigquery_client: The Google Cloud BigQuery client for your Project.
+        bigquery_client: The Google Cloud BigQuery client for your Project.
         dataframe: Pandas DataFrame representing the data to write to BigQuery.
         destination_table: String representing the destination table to write the DataFrame to.
         insert_type: Method to upload file, either 'append' or 'truncate' (truncates existing table), default 'append'.
@@ -215,7 +220,6 @@ def write_to_bigquery(dataframe: pd.DataFrame, destination_table: str,
         raise ValueError('Specified insert_type parameter {} is not an acceptable value for the parameter. insert_type '
                          'must be one of the following: {}.'.format(insert_type, str(insert_type_acceptable_values)))
 
-    bigquery_client = bigquery.Client()
     table_already_exists = True
     new_table_schema = []
 
