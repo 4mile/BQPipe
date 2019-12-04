@@ -1,7 +1,7 @@
 import bqpipe
 
 # Authenticate to BQ Project with your credentials.
-json_file_path = '/Users/johnathanbrooks/Downloads/fivetran-better-help-warehouse-5c0701231749.json'
+json_file_path = '[my key file location]'
 client = bqpipe.authenticate_with_service_account_json(json_file_path)
 
 # Read from BigQuery. If dataset not specified, default is the "analytics" dataset.

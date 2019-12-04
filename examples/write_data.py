@@ -2,7 +2,7 @@ import pandas as pd
 import bqpipe
 
 # Authenticate to BQ Project with your credentials.
-json_file_path = '/Users/johnathanbrooks/Downloads/fivetran-better-help-warehouse-5c0701231749.json'
+json_file_path = '[my key file location]'
 client = bqpipe.authenticate_with_service_account_json(json_file_path)
 
 # Specify data source and destination table.
@@ -34,7 +34,7 @@ data_schema = [
 destination_table = 'Prediction_sample'
 
 # Write to BigQuery.
-bqpipe.write_to_bigquery(client, df, destination_table, custom_new_table_schema=data_schema,
+bqpipe.write_to_bigquery(client, df, destination_table, custom_table_schema=data_schema,
                          insert_type='append')
 
 print(bqpipe.write_to_bigquery.__doc__)

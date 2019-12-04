@@ -2,7 +2,7 @@ import pandas as pd
 import bqpipe
 
 # Authenticate to BQ Project with your credentials.
-json_file_path = '/Users/johnathanbrooks/Downloads/fivetran-better-help-warehouse-5c0701231749.json'
+json_file_path = '[my key file location]'
 client = bqpipe.authenticate_with_service_account_json(json_file_path)
 
 # Specify data source and destination table.
@@ -18,4 +18,4 @@ data_schema = bqpipe.get_table_schema(client, destination_dataset, destination_t
 print(data_schema)
 
 # Write to BigQuery. If dataset not specified, default is the "analytics" dataset.
-bqpipe.write_to_bigquery(client, df, destination_table, custom_new_table_schema=data_schema)
+bqpipe.write_to_bigquery(client, df, destination_table, custom_table_schema=data_schema)

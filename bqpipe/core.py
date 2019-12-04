@@ -12,7 +12,7 @@ def authenticate_with_service_account_json(json_key_file_path: str) -> bigquery.
 
     Args:
         json_key_file_path: String representing the absolute path to your saved service account JSON key file.
-                            i.e. '/Users/johnathanbrooks/Downloads/fivetran-better-help-warehouse-adcabc123123.json'
+                            i.e. '/Users/me/Downloads/bigquerykey-adcabc123123.json'
     Returns:
         Authenticated client used to executed API calls with BigQuery.
     """
@@ -168,7 +168,7 @@ def fetch_sql_output(bigquery_client: bigquery.Client, sql_select_statement: str
 
 def write_to_bigquery(bigquery_client: bigquery.Client, dataframe: pd.DataFrame, destination_table: str,
                       insert_type: str = 'append', accept_incomplete_schema: bool = False,
-                      create_table_if_missing: bool = False, custom_new_table_schema: list = None,
+                      create_table_if_missing: bool = False, custom_table_schema: list = None,
                       accept_capital_letters: bool = False) -> tuple:
     """Write data into specified BigQuery destination table, with option to create a new table.
 
@@ -177,7 +177,7 @@ def write_to_bigquery(bigquery_client: bigquery.Client, dataframe: pd.DataFrame,
     Nullability, add a description, or ensure the column type is correct. Note: Please use the snake_case convention for
     column names for consistency.
 
-    The custom_new_table_schema takes the following format:
+    The custom_table_schema takes the following format:
     sample_schema = [
         {
             'name': 'experiment_name',  # (String) The name of the field, use camel_case.
@@ -200,7 +200,7 @@ def write_to_bigquery(bigquery_client: bigquery.Client, dataframe: pd.DataFrame,
                                   table's schema (non-included columns will be populated with Null). Default is False.
         create_table_if_missing: Boolean, specify True if the specified table should be created if it doesn't already
                             exist. Default is True (throws error if table doesn't already exist).
-        custom_new_table_schema: Tuple of dictionaries representing the schema for a new table (see above for details).
+        custom_table_schema: Tuple of dictionaries representing the schema for a new table (see above for details).
         # destination_dataset: The destination Dataset of the table to create/insert into.
         accept_capital_letters: Boolean, Set to True if you'd like to work with a table with capital letters. BigQuery
                                 generally stipulates camel_case, so this should generally not be used. Default False.
@@ -228,9 +228,9 @@ def write_to_bigquery(bigquery_client: bigquery.Client, dataframe: pd.DataFrame,
         if create_table_if_missing:
             logging.info('Creating missing specified table output "{}" in Dataset "{}" as '
                          'create_if_missing was set to True'.format(destination_table, destination_dataset))
-            if custom_new_table_schema is not None:
+            if custom_table_schema is not None:
                 logging.info('Creating table with user-specified custom schema.')
-                new_table_schema = helpers.get_detected_schema(dataframe, tuple(custom_new_table_schema))
+                new_table_schema = helpers.get_detected_schema(dataframe, tuple(custom_table_schema))
             else:
                 logging.info('Creating table without specified schema; auto-detecting schema to append table.')
         else:
@@ -241,7 +241,7 @@ def write_to_bigquery(bigquery_client: bigquery.Client, dataframe: pd.DataFrame,
             raise ValueError('Specified table "{}" does not exist.'.format(destination_table))
 
     # Add appended created_at column to DataFrame
-    dataframe['created_at'] = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+    dataframe['bigquery_created_at'] = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
 
     job_config = bigquery.LoadJobConfig()
     job_config.write_disposition = bigquery.WriteDisposition.WRITE_EMPTY
@@ -249,7 +249,7 @@ def write_to_bigquery(bigquery_client: bigquery.Client, dataframe: pd.DataFrame,
         job_config.allow_jagged_rows = True
     job_config.ignore_unknown_values = True
 
-    if custom_new_table_schema is None:
+    if custom_table_schema is None:
         job_config.autodetect = True
     else:
         job_config.schema = new_table_schema
