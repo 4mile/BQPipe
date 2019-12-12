@@ -1,4 +1,4 @@
-from setuptools import setup, find_packages
+from setuptools import setup
 from os import path
 
 here = path.abspath(path.dirname(__file__))
@@ -6,11 +6,8 @@ here = path.abspath(path.dirname(__file__))
 with open(path.join(here, 'README.rst'), encoding='utf-8') as readme_file:
     long_description = readme_file.read()
 
-# with open('LICENSE') as f:
-#     license = f.read()
-
-# Arguments marked as "Required" below must be included for upload to PyPI.
-# Fields marked as "Optional" may be commented out.
+with open('LICENSE') as f:
+    package_license = f.read()
 
 setup(
     name='bqpipe',
@@ -43,8 +40,10 @@ setup(
 
     python_requires='>=3.7, <4',
     install_requires=[
+        'numpy',
         'pandas',
-        'google-cloud-bigquery'
+        'google-cloud-bigquery',
+        'pyarrow'
     ],
     # extras_require={
     #     'dev': ['check-manifest'],
@@ -57,7 +56,7 @@ setup(
     #     ],
     # },
 
-    project_urls={  # Optional
+    project_urls={
         'Bug Reports': 'https://github.com/jmbrooks/BQPipe/issues',
         'Source': 'https://github.com/jmbrooks/BQPipe',
     },
