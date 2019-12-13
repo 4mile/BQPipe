@@ -228,7 +228,7 @@ class BigQueryClient(object):
         table_already_exists = True
         new_table_schema = []
 
-        if not helpers.does_table_exist(bigquery_client, destination_table, dataset=DESTINATION_DATASET):
+        if not helpers.does_table_exist(self.client, destination_table, dataset=DESTINATION_DATASET):
             table_already_exists = False
             if create_table_if_missing:
                 logging.info('Creating missing specified table output "{}" in Dataset "{}" as '
