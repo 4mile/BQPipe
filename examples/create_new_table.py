@@ -10,7 +10,7 @@ with open('config.json') as config_file:
 json_file_path = data['json_file_path']
 client = bqpipe.BigQueryClient(json_file_path)
 
-# Specify data source and destination table.
+# Specify data source (empty DataFrame for new table) and destination table.
 df = pd.DataFrame()
 
 new_table_schema = [

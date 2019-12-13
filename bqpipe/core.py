@@ -246,7 +246,19 @@ class BigQueryClient(object):
                 raise ValueError('Specified table "{}" does not exist.'.format(destination_table))
 
         # Add appended created_at column to DataFrame
-        dataframe['bigquery_created_at'] = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+        created_at_col = 'bq_created_at'
+        if dataframe.shape[0] > 0:
+            dataframe[created_at_col] = pd.Timestamp(datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3])
+            output_schema = new_table_schema
+        else:
+            created_at_schema = {
+                'name': created_at_col,
+                'field_type': 'timestamp',
+                'mode': 'required',
+                'description': 'Timestamp for time field was added to BigQuery.'
+            }
+            output_schema = new_table_schema.append(created_at_schema)
+            logging.debug(output_schema)
 
         job_config = bigquery.LoadJobConfig()
         job_config.write_disposition = bigquery.WriteDisposition.WRITE_EMPTY
@@ -257,7 +269,7 @@ class BigQueryClient(object):
         if custom_table_schema is None:
             job_config.autodetect = True
         else:
-            job_config.schema = new_table_schema
+            job_config.schema = output_schema
 
         if insert_type == 'append' and table_already_exists:
             logging.info('Appending input data to existing table {}.'.format(destination_table))

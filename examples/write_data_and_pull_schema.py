@@ -15,7 +15,7 @@ df = pd.read_csv(csv_data_path)
 
 # Specify BigQuery destination table.
 destination_dataset = 'analytics'
-destination_table = 'prediction_sample'
+destination_table = 'prediction_sample_test'
 
 # Pull schema from destination table.
 data_schema = client.get_table_schema(destination_dataset, destination_table)

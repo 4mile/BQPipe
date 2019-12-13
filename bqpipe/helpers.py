@@ -18,7 +18,7 @@ def does_table_exist(bigquery_client: bigquery.Client, table: str, dataset: str 
         return False
 
 
-def get_detected_schema(dataframe: pd.DataFrame, custom_schema: tuple = None) -> tuple:
+def get_detected_schema(dataframe: pd.DataFrame, custom_schema: tuple = None) -> list:
     """Return tuple of dictionaries with detected schema (auto-detect if custom_schema not specified)."""
     output_schema = []
     field_names = []
@@ -53,4 +53,4 @@ def get_detected_schema(dataframe: pd.DataFrame, custom_schema: tuple = None) ->
                                                  description='Date inserted into BigQuery.')
         output_schema.append(created_at_schema)
 
-    return tuple(output_schema)
+    return output_schema

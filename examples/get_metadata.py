@@ -34,3 +34,7 @@ print('\n')
 print(client.get_table_schema.__doc__)
 print('Table Schema Result:')
 print(schema)
+
+print('\nClient property examples:')
+print(client.project)
+print(client.location)
