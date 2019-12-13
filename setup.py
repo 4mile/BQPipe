@@ -33,8 +33,6 @@ setup(
         'Programming Language :: Python :: 3.8',
     ],
     keywords='bigquery google cloud etl data engineering dataframe pandas',
-
-    package_dir={'': 'bqpipe'},
     packages=['bqpipe'],
 
     python_requires='>=3.7, <4',
