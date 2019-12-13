@@ -11,13 +11,13 @@ with open('LICENSE') as f:
 
 setup(
     name='bqpipe',
-    version='0.3.1',
+    version='0.3.3',
 
     description='Wrapper around BigQuery library to simplify writing to/reading from BigQuery to Pandas DataFrames.',
     long_description=long_description,
     long_description_content_type='text/x-rst',
 
-    url='https://github.com/jmbrooks/BQPipe',
+    url='https://github.com/4mile/BQPipe',
     license=license,
     author='Johnathan Brooks',
     author_email='jb@4mile.io',
@@ -44,16 +44,6 @@ setup(
         'google-cloud-bigquery',
         'pyarrow'
     ],
-    # extras_require={
-    #     'dev': ['check-manifest'],
-    #     'test': ['coverage'],
-    # },
-
-    # entry_points={  # Optional
-    #     'console_scripts': [
-    #         'sample=sample:main',
-    #     ],
-    # },
 
     project_urls={
         'Bug Reports': 'https://github.com/4mile/BQPipe/issues',
