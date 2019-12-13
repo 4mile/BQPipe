@@ -11,29 +11,28 @@ with open('LICENSE') as f:
 
 setup(
     name='bqpipe',
-    version='0.3.0',
+    version='0.3.1',
 
     description='Wrapper around BigQuery library to simplify writing to/reading from BigQuery to Pandas DataFrames.',
     long_description=long_description,
     long_description_content_type='text/x-rst',
 
     url='https://github.com/jmbrooks/BQPipe',
-    # license=license,
+    license=license,
     author='Johnathan Brooks',
     author_email='jb@4mile.io',
 
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',
-        'Topic :: Data Engineering :: ETL',
-        'License :: OSI Approved :: MIT License',
+        'License :: OSI Approved :: Apache Software License',
+        'Topic :: Database',
+        'Programming Language :: Python',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.5',
-        'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
     ],
-    keywords='bigquery looker etl data engineering dataframe',
+    keywords='bigquery google cloud etl data engineering dataframe pandas',
 
     package_dir={'': 'bqpipe'},
     packages=['bqpipe'],
@@ -57,7 +56,7 @@ setup(
     # },
 
     project_urls={
-        'Bug Reports': 'https://github.com/jmbrooks/BQPipe/issues',
-        'Source': 'https://github.com/jmbrooks/BQPipe',
+        'Bug Reports': 'https://github.com/4mile/BQPipe/issues',
+        'Source': 'https://github.com/4mile/BQPipe',
     },
 )
