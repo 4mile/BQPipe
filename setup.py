@@ -11,7 +11,7 @@ with open('LICENSE') as f:
 
 setup(
     name='bqpipe',
-    version='0.3.3',
+    version='0.4.0',
 
     description='Wrapper around BigQuery library to simplify writing to/reading from BigQuery to Pandas DataFrames.',
     long_description=long_description,
@@ -23,7 +23,7 @@ setup(
     author_email='jb@4mile.io',
 
     classifiers=[
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: Apache Software License',
         'Topic :: Database',
