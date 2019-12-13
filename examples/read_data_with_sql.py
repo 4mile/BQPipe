@@ -1,8 +1,13 @@
+import json
 import bqpipe
 
+# Fetch key file path from config.json file in current directory.
+with open('config.json') as config_file:
+    data = json.load(config_file)
+
 # Authenticate to BQ Project with your credentials.
-json_file_path = '[my key file location]'
-client = bqpipe.authenticate_with_service_account_json(json_file_path)
+json_file_path = data['json_file_path']
+client = bqpipe.BigQueryClient(json_file_path)
 
 # Specify the SQL statement you'd like to execute.
 sql = """
@@ -11,5 +16,5 @@ sql = """
 """
 
 # Get output as DataFrame.
-df = bqpipe.fetch_sql_output(client, sql)
+df = client.fetch_sql_output(sql)
 print(df)

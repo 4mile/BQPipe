@@ -1,9 +1,13 @@
-import pandas as pd
+import json
 import bqpipe
 
+# Fetch key file path from config.json file in current directory.
+with open('config.json') as config_file:
+    data = json.load(config_file)
+
 # Authenticate to BQ Project with your credentials.
-json_file_path = '[my key file location]'
-client = bqpipe.authenticate_with_service_account_json(json_file_path)
+json_file_path = data['json_file_path']
+client = bqpipe.BigQueryClient(json_file_path)
 
 # Specify data source and destination table.
 csv_data_path = 'sample_experiment_data.csv'
@@ -34,7 +38,7 @@ data_schema = [
 destination_table = 'Prediction_sample'
 
 # Write to BigQuery.
-bqpipe.write_to_bigquery(client, df, destination_table, custom_table_schema=data_schema,
+client.write_to_bigquery(df, destination_table, custom_table_schema=data_schema,
                          insert_type='append')
 
-print(bqpipe.write_to_bigquery.__doc__)
+print(client.write_to_bigquery.__doc__)
