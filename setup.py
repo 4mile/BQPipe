@@ -13,7 +13,7 @@ setup(
     name='bqpipe',
     version='0.5.0',
 
-    description='Wrapper around BigQuery library to simplify writing to/reading from BigQuery to Pandas DataFrames.',
+    description='Wrapper around BigQuery & Snowflake libraries to simplify writing to/reading from Pandas DataFrames.',
     long_description=long_description,
     long_description_content_type='text/x-rst',
 
