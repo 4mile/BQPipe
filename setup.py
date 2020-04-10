@@ -32,7 +32,7 @@ setup(
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
     ],
-    keywords='bigquery google cloud etl data engineering dataframe pandas',
+    keywords='bigquery snowflake google cloud etl data engineering dataframe pandas',
     packages=['bqpipe'],
 
     python_requires='>=3.7, <4',
@@ -40,7 +40,9 @@ setup(
         'numpy',
         'pandas',
         'google-cloud-bigquery',
-        'pyarrow'
+        'pyarrow',
+        'snowflake-connector-python[pandas]',
+        'snowflake-sqlalchemy'
     ],
 
     project_urls={
