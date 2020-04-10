@@ -7,7 +7,7 @@ with open('config.json') as config_file:
 
 # Authenticate to BQ Project with your credentials.
 json_file_path = data['json_file_path']
-client = bqpipe.BigQueryClient(json_file_path)
+client = bqpipe.SnowflakeClient(json_file_path)
 
 # Get datasets
 datasets = client.list_datasets()

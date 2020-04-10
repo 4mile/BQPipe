@@ -94,3 +94,5 @@ ENV/
 
 # Config
 examples/config.json
+
+bqpipe/examples

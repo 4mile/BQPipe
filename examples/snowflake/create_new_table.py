@@ -3,12 +3,12 @@ import pandas as pd
 import bqpipe
 
 # Fetch key file path from config.json file in current directory.
-    with open('config.json') as config_file:
-        data = json.load(config_file)
+with open('config.json') as config_file:
+    data = json.load(config_file)
 
-    # Authenticate to BQ Project with your credentials.
-    json_file_path = data['json_file_path']
-    client = bqpipe.BigQueryClient(json_file_path)
+# Authenticate to BQ Project with your credentials.
+json_file_path = data['json_file_path']
+client = bqpipe.SnowflakeClient(json_file_path)
 
 # Specify data source (empty DataFrame for new table) and destination table.
 df = pd.DataFrame()
@@ -50,4 +50,4 @@ new_table_schema = [
 destination_table = 'sample_experiment_table'
 
 # Write to BigQuery.
-client.write_to_bigquery(df, destination_table, custom_table_schema=new_table_schema)
+client.write_to_snowflake(df, destination_table, custom_table_schema=new_table_schema)

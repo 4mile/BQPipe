@@ -1,1 +1,2 @@
-from .core import BigQueryClient
+from .bigquery import BigQueryClient
+from .snowflake import SnowflakeClient

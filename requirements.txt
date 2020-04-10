@@ -2,3 +2,5 @@ numpy
 pandas
 google-cloud-bigquery
 pyarrow
+cryptography
+snowflake-connector-python[pandas]

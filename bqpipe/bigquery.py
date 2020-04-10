@@ -4,7 +4,6 @@ import pandas as pd
 from typing import Union
 from google.cloud import bigquery
 from google.cloud.exceptions import BadRequest, NotFound
-from . import helpers
 
 # Destination dataset for writing tables, only dataset that users can write to.
 DESTINATION_DATASET = 'analytics'
@@ -228,14 +227,14 @@ class BigQueryClient(object):
         table_already_exists = True
         new_table_schema = []
 
-        if not helpers.does_table_exist(self.client, destination_table, dataset=DESTINATION_DATASET):
+        if not does_table_exist(self.client, destination_table, dataset=DESTINATION_DATASET):
             table_already_exists = False
             if create_table_if_missing:
                 logging.info('Creating missing specified table output "{}" in Dataset "{}" as '
                              'create_if_missing was set to True'.format(destination_table, DESTINATION_DATASET))
                 if custom_table_schema is not None:
                     logging.info('Creating table with user-specified custom schema.')
-                    new_table_schema = helpers.get_detected_schema(dataframe, tuple(custom_table_schema))
+                    new_table_schema = get_detected_schema(dataframe, tuple(custom_table_schema))
                 else:
                     logging.info('Creating table without specified schema; auto-detecting schema to append table.')
             else:
@@ -293,3 +292,54 @@ class BigQueryClient(object):
             raise RuntimeError(load_job.errors)
 
         return load_response
+
+
+def does_table_exist(bigquery_client: bigquery.Client, table: str, dataset: str = 'analytics') -> bool:
+    """Check if given table from given Dataset exists in BigQuery, return True if so."""
+    try:
+        table_reference = bigquery_client.dataset(dataset).table(table)
+        is_table = bigquery_client.get_table(table_reference)
+        if is_table:
+            logging.info('Table "{}" in Dataset "{}" already exists in BigQuery.'.format(table, dataset))
+            return True
+    except NotFound as error:
+        logging.warning('Table "{}" does not exist in BigQuery Dataset "{}". Ref: {}.'.format(table, dataset, error))
+        return False
+
+
+def get_detected_schema(dataframe: pd.DataFrame, custom_schema: tuple = None) -> list:
+    """Return tuple of dictionaries with detected schema (auto-detect if custom_schema not specified)."""
+    output_schema = []
+    field_names = []
+    if custom_schema:
+        for schema in custom_schema:
+            if 'name' not in schema or 'field_type' not in schema:
+                logging.error(
+                    'You have at least one schema column defined without a name or field_type. All columns in\n'
+                    'custom schema must have specified keys "name" and "field_type". Update your custom schema.')
+                sys.exit()
+            if 'mode' not in schema:
+                schema['mode'] = 'NULLABLE'
+            name, f_type, mode = schema['name'].lower(), schema['field_type'].upper(), schema['mode'].upper()
+            if 'description' not in schema:
+                column_schema = bigquery.SchemaField(name, f_type, mode=mode)
+            else:
+                column_schema = bigquery.SchemaField(name, f_type, mode=mode, description=schema['description'])
+            output_schema.append(column_schema)
+            field_names.append(name)
+    else:
+        print(dataframe.head())
+        logging.error("Auto-detect not yet implemented, please specify custom schema.")
+        sys.exit()
+
+    if 'created_at' in field_names:
+        logging.error('You''ve specified a "created_at" field, however, this field is added automatically during\n'
+                      'upload to capture upload to BigQuery time and is a BQPipe system field. Please choose another'
+                      'field name for your field.')
+        sys.exit()
+    else:
+        created_at_schema = bigquery.SchemaField('created_at', 'STRING', mode='REQUIRED',
+                                                 description='Date inserted into BigQuery.')
+        output_schema.append(created_at_schema)
+
+    return output_schema
