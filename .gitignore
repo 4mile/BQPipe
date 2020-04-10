@@ -94,5 +94,6 @@ ENV/
 
 # Config
 examples/config.json
+test_example.py
 
 bqpipe/examples

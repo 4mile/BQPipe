@@ -11,10 +11,12 @@ from cryptography.hazmat.primitives import serialization
 
 import snowflake.connector
 from snowflake.connector.errors import Error
+from snowflake.sqlalchemy import URL
+from sqlalchemy import create_engine
 
 # Destination dataset for writing tables, only dataset that users can write to.
-APP_NAME = 'BQPipe'
-DESTINATION_DATASET = 'analytics'
+APP_NAME = 'DWPipe'
+DEFAULT_DESTINATION_DATASET = 'analytics'
 
 
 class SnowflakeClient(object):
@@ -45,9 +47,12 @@ class SnowflakeClient(object):
         auth_and_connection_params = self._validate_params(authentication_params, connection_details)
 
         if self.authentication_method == 'KEY_PAIR':
-            self.client = self._authenticate_with_key_pair(**auth_and_connection_params)
+            rsa_path = auth_and_connection_params.pop('rsa_key_path')
+            passphrase = auth_and_connection_params.pop('private_passphrase', None)
+            self.client, self.engine = self._authenticate_with_key_pair(
+                rsa_path, passphrase, **auth_and_connection_params)
         elif self.authentication_method == 'USER_LOGIN':
-            self.client = self._authenticate_with_user_credentials(**auth_and_connection_params)
+            self.client, self.engine = self._authenticate_with_user_credentials(**auth_and_connection_params)
         else:
             logging.error('You have chosen an invalid authentication method, please use either "KEY_PAIR" or '
                           '"USER_LOGIN" and supply appropriate login credentials accordingly')
@@ -64,6 +69,8 @@ class SnowflakeClient(object):
             self.cursor.close()
         if self.client:
             self.client.close()
+        if self.engine:
+            self.engine.dispose()
 
     def _validate_params(self, authentication_params, connection_details):
         """Validate input parameters based on authentication choice"""
@@ -89,15 +96,16 @@ class SnowflakeClient(object):
         else:
             return authentication_params
 
-    def _authenticate_with_key_pair(self, rsa_key_path: str, private_passphrase: str = None,
-                                    connection_details: dict = None,
-                                    **kwargs) -> snowflake.connector.SnowflakeConnection:
+    def _authenticate_with_key_pair(self, rsa_key_path: str, private_passphrase: str,
+                                    **kwargs) -> tuple:
         with open(rsa_key_path, "rb") as key:
-            p_key = serialization.load_pem_private_key(
-                key.read(),
-                password=private_passphrase.encode(),
-                backend=default_backend()
-            )
+            if private_passphrase:
+                private_passphrase = private_passphrase.encode()
+                p_key = serialization.load_pem_private_key(
+                    key.read(),
+                    password=private_passphrase,
+                    backend=default_backend()
+                )
 
         pkb = p_key.private_bytes(
             encoding=serialization.Encoding.DER,
@@ -105,7 +113,7 @@ class SnowflakeClient(object):
             encryption_algorithm=serialization.NoEncryption()
         )
 
-        return snowflake.connector.connect(
+        client = snowflake.connector.connect(
             account=self.account_name,
             application=APP_NAME,
             validate_default_parameters=True,
@@ -114,14 +122,32 @@ class SnowflakeClient(object):
             **kwargs
         )
 
-    def _authenticate_with_user_credentials(self, **kwargs) -> snowflake.connector.SnowflakeConnection:
-        return snowflake.connector.connect(
+        engine = create_engine(URL(
+            account=self.account_name,
+            application=APP_NAME,
+            validate_default_parameters=True,
+            protocol='https',
+            private_key=pkb,
+            **kwargs
+        ))
+
+        return client, engine
+
+    def _authenticate_with_user_credentials(self, **kwargs) -> tuple:
+        client = snowflake.connector.connect(
             account=self.account_name,
             application=APP_NAME,
             validate_default_parameters=True,
             protocol='https',
             **kwargs
         )
+        engine = create_engine(URL(
+            account=self.account_name,
+            application=APP_NAME,
+            **kwargs
+        ))
+
+        return client, engine
 
     @property
     def region(self) -> str:
@@ -187,7 +213,7 @@ class SnowflakeClient(object):
             database = database.upper()
         if schema and set_uppercase:
             schema = schema.upper()
-        
+
         if not database and self.current_database:
             database = self.current_database
         elif not database and not self.current_database:
@@ -297,8 +323,7 @@ class SnowflakeClient(object):
             exit(1)
 
     def insert_into_table(self, dataframe: pd.DataFrame, destination_table: str, insert_type: str = 'append',
-                          accept_incomplete_schema: bool = False, create_table_if_missing: bool = False,
-                          custom_table_schema: list = None, accept_capital_letters: bool = False) -> tuple:
+                          create_table_if_missing: bool = False, custom_table_schema: list = None):
         """Write data into specified Snowflake destination table, with option to create a new table.
 
         If you would like to create a new table, set create_if_missing to True. By default, the script will autodetect
@@ -321,29 +346,20 @@ class SnowflakeClient(object):
         ]
 
         Args:
-            dataframe: Pandas DataFrame representing the data to write to BigQuery.
+            dataframe: Pandas DataFrame representing the data to write to Snowflake.
             destination_table: String representing the destination table to write the DataFrame to.
             insert_type: (Optional) String representing the Method to upload the file, either 'append' or 'truncate'
                          (truncates existing table), default 'append'.
-            accept_incomplete_schema: (Optional) Boolean, specify True if sending DataFrame that does not perfectly
-                                      match the BigQuery table's schema (non-included columns will be populated with
-                                      Null). Default is False.
             create_table_if_missing: (Optional) Boolean, specify True if the specified table should be created if it
                                      doesn't already exist. Default is True (throws error if table doesn't exist).
             custom_table_schema: (Optional) Tuple of dictionaries representing the schema for a new table (see above for
                                  further details on example schema).
-            accept_capital_letters: (Optional) Boolean, Set to True if you'd like to work with a table with capital
-                                    letters. BigQuery naming conventions typically follow camel_case, so this should
-                                    generally not be used. Default is False.
         Returns:
             Tuple with the response of the table write API request.
         """
-        destination_table = destination_table.strip()
+        destination_table = destination_table.lower().strip()
         insert_type = insert_type.lower().strip()
         insert_type_acceptable_values = ('append', 'truncate')
-
-        if not accept_capital_letters:
-            destination_table = destination_table.lower()
 
         if insert_type not in insert_type_acceptable_values:
             raise ValueError('Specified insert_type parameter {} is not an acceptable value. insert_type must be '
@@ -352,127 +368,81 @@ class SnowflakeClient(object):
         table_already_exists = True
         new_table_schema = []
 
-        if not does_table_exist(self.client, destination_table, schema=DESTINATION_DATASET):
+        if not self.does_table_exist(DEFAULT_DESTINATION_DATASET, destination_table):
             table_already_exists = False
             if create_table_if_missing:
-                logging.info('Creating missing specified table output "{}" in Dataset "{}" as '
-                             'create_if_missing was set to True'.format(destination_table, DESTINATION_DATASET))
-                if custom_table_schema is not None:
-                    logging.info('Creating table with user-specified custom schema.')
-                    new_table_schema = get_detected_schema(dataframe, tuple(custom_table_schema))
-                else:
-                    logging.info('Creating table without specified schema; auto-detecting schema to append table.')
+                raise ValueError('Not yet supported, cannot create table from BQPipe yet, coming in next release')
+                # logging.info('Creating missing specified table output "{}" in Dataset "{}" as '
+                #              'create_if_missing set to True'.format(destination_table, DEFAULT_DESTINATION_DATASET))
+                # if custom_table_schema is not None:
+                #     logging.info('Creating table with user-specified custom schema.')
+                #     new_table_schema = get_detected_schema(dataframe, tuple(custom_table_schema))
+                # else:
+                #     logging.info('Creating table without specified schema; auto-detecting schema to append table.')
             else:
-                logging.error('Write to BigQuery failed as table "{table}" does not exist in Dataset "{dataset}".'
+                logging.error('Write to Snowflake failed as table "{table}" does not exist in Dataset "{dataset}".'
                               'Either update the specified table name to an existing table, or set function parameter\n'
                               'create_if_missing to True to create "{dataset}.{table}".'.format(
-                                table=destination_table, dataset=DESTINATION_DATASET))
+                                table=destination_table, dataset=DEFAULT_DESTINATION_DATASET))
                 raise ValueError('Specified table "{}" does not exist.'.format(destination_table))
 
         # Add appended created_at column to DataFrame
-        created_at_col = 'bq_created_at'
+        created_at_col = 'dwpipe_created_at'
         if dataframe.shape[0] > 0:
-            dataframe[created_at_col] = pd.Timestamp(datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3])
+            dataframe[created_at_col] = pd.Timestamp(datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'))
             output_schema = new_table_schema
         else:
-            created_at_schema = {
-                'name': created_at_col,
-                'field_type': 'timestamp',
-                'mode': 'required',
-                'description': 'Timestamp for time field was added to BigQuery.'
-            }
-            output_schema = new_table_schema.append(created_at_schema)
-            logging.debug(output_schema)
+            # created_at_schema = {
+            #     'name': created_at_col,
+            #     'field_type': 'timestamp',
+            #     'mode': 'required',
+            #     'description': 'Timestamp for time field was added to Snowflake.'
+            # }
+            # output_schema = new_table_schema.append(created_at_schema)
+            output_schema = new_table_schema
+            # logging.debug(output_schema)
 
-        job_config = bigquery.LoadJobConfig()
-        job_config.write_disposition = bigquery.WriteDisposition.WRITE_EMPTY
-        if accept_incomplete_schema:
-            job_config.allow_jagged_rows = True
-        job_config.ignore_unknown_values = True
-
-        if custom_table_schema is None:
-            job_config.autodetect = True
+        # if insert_type == 'append' and table_already_exists:
+        #     logging.info('Appending input data to existing table {}.'.format(destination_table))
+        # elif insert_type == 'truncate' and table_already_exists:
+        #     logging.warning('Insert type set to Truncate, table will be truncated to prior to writing input data.')
+        # else:
+        #     logging.info('Creating new table "{}" and populating with input data.'.format(destination_table))
+        if insert_type == 'append':
+            dataframe.to_sql(destination_table, schema=DEFAULT_DESTINATION_DATASET, con=self.engine,
+                             if_exists='append', index=False)
+            logging.info('Append of {} rows to {}.{} successful'.format(
+                dataframe.shape[0], DEFAULT_DESTINATION_DATASET, destination_table))
+        elif insert_type == 'truncate':
+            dataframe.to_sql(destination_table, schema=DEFAULT_DESTINATION_DATASET, con=self.engine,
+                             if_exists='replace', index=False)
+            logging.info('Truncate of table {}.{} successful, ingested {} rows'.format(
+                DEFAULT_DESTINATION_DATASET, destination_table, dataframe.shape[0]))
         else:
-            job_config.schema = output_schema
+            dataframe.to_sql(destination_table, schema=DEFAULT_DESTINATION_DATASET, con=self.engine,
+                             if_exists='fail', index=False)
+            logging.info('Insert of {} rows to {}.{} successful'.format(
+                dataframe.shape[0], DEFAULT_DESTINATION_DATASET, destination_table))
 
-        if insert_type == 'append' and table_already_exists:
-            logging.info('Appending input data to existing table {}.'.format(destination_table))
-            job_config.write_disposition = bigquery.WriteDisposition.WRITE_APPEND
-        elif insert_type == 'truncate' and table_already_exists:
-            logging.warning('Insert type set to Truncate, table will be truncated to prior to writing input data.')
-            job_config.write_disposition = bigquery.WriteDisposition.WRITE_TRUNCATE
-        else:
-            logging.info('Creating new table "{}" which will be populated with input data.'.format(destination_table))
-            job_config.write_disposition = bigquery.WriteDisposition.WRITE_EMPTY
-
-        table_id = DESTINATION_DATASET + '.' + destination_table
-        load_job = self.client.load_table_from_dataframe(
-            dataframe, table_id, job_config=job_config
-        )
-
-        assert load_job.job_type == 'load'
-        load_response = load_job.result()  # Waits for table load to complete.
-        assert load_job.state == 'DONE'
-        if load_job.error_result:
-            raise RuntimeError(load_job.errors)
-
-        return load_response
-    
-    
-def does_table_exist(snowflake_client: snowflake.connector.SnowflakeConnection,
-                     table: str, schema: str = 'analytics') -> bool:
-    """Check if given table from given schema exists in Snowflake, return True if so."""
-    try:
-        cursor = snowflake_client.cursor()
-        existence_check_sql = """
-        SELECT  COUNT(*)
-        FROM    information_schema.tables
-        WHERE   table_schema = '{}'
-                AND table_name = '{}'
-        """.format(schema, table)
-        cursor.execute(existence_check_sql)
-        result = cursor.fetchone()
-        if result:
-            logging.info('Table "{}" in Schema "{}" exists in Snowflake.'.format(table, schema))
-            return True
-    except errors.Error as error:
-        logging.warning('Table "{}" does not exist in Snowflake Schema "{}" or difficulty connecting to confirm if '
-                        'table exists in Snowflake. Ref: {}.'.format(table, schema, error))
-        return False
-
-
-def get_detected_schema(dataframe: pd.DataFrame, custom_schema: tuple = None) -> list:
-    """Return tuple of dictionaries with detected schema (auto-detect if custom_schema not specified)."""
-    output_schema = []
-    field_names = []
-    if custom_schema:
-        for schema in custom_schema:
-            if 'name' not in schema or 'field_type' not in schema:
-                logging.error(
-                    'You have at least one schema column defined without a name or field_type. All columns in\n'
-                    'custom schema must have specified keys "name" and "field_type". Update your custom schema.')
-                sys.exit()
-            if 'mode' not in schema:
-                schema['mode'] = 'NULLABLE'
-            name, f_type, mode = schema['name'].lower(), schema['field_type'].upper(), schema['mode'].upper()
-            if 'description' not in schema:
-                column_schema = bigquery.SchemaField(name, f_type, mode=mode)
-            else:
-                column_schema = bigquery.SchemaField(name, f_type, mode=mode, description=schema['description'])
-            output_schema.append(column_schema)
-            field_names.append(name)
-    else:
-        logging.error("Auto-detect not yet implemented, please specify custom schema.")
-        sys.exit()
-
-    if 'created_at' in field_names:
-        logging.error('You''ve specified a "created_at" field, however, this field is added automatically during\n'
-                      'upload to capture upload to BigQuery time and is a BQPipe system field. Please choose another'
-                      'field name for your field.')
-        sys.exit()
-    else:
-        created_at_schema = bigquery.SchemaField('created_at', 'STRING', mode='REQUIRED',
-                                                 description='Date inserted into BigQuery.')
-        output_schema.append(created_at_schema)
-
-    return output_schema
+    def does_table_exist(self, schema: str, table: str, set_uppercase: bool = True) -> bool:
+        """Check if given table from given schema exists in Snowflake, return True if so."""
+        if schema and set_uppercase:
+            schema = schema.upper()
+        if table and set_uppercase:
+            table = table.upper()
+        try:
+            existence_check_sql = """
+            SELECT  COUNT(*)
+            FROM    information_schema.tables
+            WHERE   table_schema = '{}'
+                    AND table_name = '{}'
+            """.format(schema, table)
+            self.cursor.execute(existence_check_sql)
+            result = self.cursor.fetchone()
+            if result:
+                logging.info('Table "{}" in Schema "{}" exists in Snowflake.'.format(table, schema))
+                return True
+        except Error as e:
+            logging.warning('Table "{}" does not exist in Snowflake Schema "{}" or difficulty connecting to confirm if '
+                            'table exists in Snowflake. Ref: {}.'.format(table, schema, e))
+            return False
