@@ -1,6 +1,7 @@
-import os
 import datetime
 import logging
+import os
+import re
 import pandas as pd
 from typing import Union
 
@@ -16,7 +17,7 @@ from sqlalchemy import create_engine
 
 # Destination dataset for writing tables, only dataset that users can write to.
 APP_NAME = 'DWPipe'
-DEFAULT_DESTINATION_DATASET = 'analytics'
+DEFAULT_DESTINATION_DATASET = 'ANALYTICS'
 
 
 class SnowflakeClient(object):
@@ -298,7 +299,7 @@ class SnowflakeClient(object):
 
             return self.cursor.fetch_pandas_all()
 
-        except Error as e:
+        except Exception as e:
             logging.error('One of the objects specified in your query does not exist or the query connection failed. '
                           'Please review and confirm the table exists and is spelled correctly with the correct '
                           'dataset specified.\nError Details: {}'.format(e))
@@ -316,7 +317,7 @@ class SnowflakeClient(object):
             self.cursor.execute(sql_select_statement)
             return self.cursor.fetch_pandas_all()
 
-        except Error as e:
+        except Exception as e:
             logging.error('One of the SQL objects specified in your query does not exist or the SQL is invalid. Please '
                           'review and confirm all tables in the query are spelled correctly with their correct '
                           'dataset specified. Error details: {}'.format(e))
@@ -371,7 +372,7 @@ class SnowflakeClient(object):
         if not self.does_table_exist(DEFAULT_DESTINATION_DATASET, destination_table):
             table_already_exists = False
             if create_table_if_missing:
-                raise ValueError('Not yet supported, cannot create table from BQPipe yet, coming in next release')
+                raise ValueError('Not yet supported, cannot create table from DWPipe yet, coming in next release')
                 # logging.info('Creating missing specified table output "{}" in Dataset "{}" as '
                 #              'create_if_missing set to True'.format(destination_table, DEFAULT_DESTINATION_DATASET))
                 # if custom_table_schema is not None:
@@ -446,3 +447,38 @@ class SnowflakeClient(object):
             logging.warning('Table "{}" does not exist in Snowflake Schema "{}" or difficulty connecting to confirm if '
                             'table exists in Snowflake. Ref: {}.'.format(table, schema, e))
             return False
+
+    def obtain_table_by_regex(self, search_table: str, scratch_schema: str = 'LOOKER_SCRATCH',
+                              database: str = None) -> Union[str, None]:
+        """Use a basic regular expression to obtain a table (i.e. Looker PDT) without all that nasty junk up front.
+        Right now this use case is only useful for Looker PDT's, so it only searches that schema.
+
+        Args:
+            search_table: The approximate name of the table you are trying to find.
+            scratch_schema: The schema to search for table, default to LOOKER_SCRATCH schema for Looker PDTs.
+            database: The database to search, defaults to current active database for logged in user.
+        Returns:
+            The exact name of the table from the scratch schema.
+        """
+        logging.info('Attempting to find regex matching table "{}" in schema {}'.format(search_table, scratch_schema))
+
+        table_list = self.list_tables(database or self.current_database, scratch_schema)
+
+        reg = re.compile(search_table, re.IGNORECASE)
+        search_result = []
+
+        for table in table_list:
+            table_name = table[0]
+            if bool(reg.search(table_name)):
+                search_result.append(table_name)
+
+        if len(search_result) == 1:
+            logging.debug('Table: ' + search_table + ' search succeeded. Single table successfully found.')
+            return search_result[0]
+        elif len(search_result) == 0:
+            logging.info('Table: ' + search_table + ' search failed. No tables found.')
+        else:
+            logging.info('Table: {} search failed. Too many tables found, found {}.'.format(
+                search_table, search_result))
+
+        return
