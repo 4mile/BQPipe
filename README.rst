@@ -1,9 +1,10 @@
 =============================
-bqpipe: BigQuery & DataFrames
+bqpipe: Warehouse & DataFrame
 =============================
 
-A lightweight Python wrapper around Google Cloud BigQuery's API
-to simplify read and write between Pandas DataFrames and BigQuery.
+A lightweight Python wrapper around the Google Cloud BigQuery and
+Snowflake data platform APIs to simplify read and write
+between Pandas DataFrames and BigQuery/Snowflake.
 
 Features
 --------
@@ -23,8 +24,12 @@ Installation requires `NumPy
 <https://pandas.pydata.org/>`_,
 `Google-Cloud-BigQuery
 <https://pypi.org/project/google-cloud-bigquery/>`_,
-and `PyArrow
-<https://pypi.org/project/pyarrow/>`_.
+`Snowflake-Connector-Python
+<https://pypi.org/project/snowflake-connector-python/>`_,
+`Snowflake-SQLAlchemy
+<https://pypi.org/project/snowflake-sqlalchemy/>`_,
+and `Cryptography
+<https://pypi.org/project/cryptography/>`_.
 
 Installation
 ------------

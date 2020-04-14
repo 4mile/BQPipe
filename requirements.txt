@@ -1,7 +1,7 @@
+cryptography
 numpy
 pandas
-google-cloud-bigquery
-pyarrow
-cryptography
-snowflake-connector-python[pandas]
-snowflake-sqlalchemy
+pyarrow==0.16.0
+google-cloud-bigquery==1.24.0
+snowflake-connector-python[pandas]==2.2.4
+snowflake-sqlalchemy==1.2.3
