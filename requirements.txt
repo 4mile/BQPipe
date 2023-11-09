@@ -1,7 +1,7 @@
 cryptography
 numpy
 pandas
-pyarrow==0.16.0
+pyarrow==14.0.1
 google-cloud-bigquery==1.24.0
 snowflake-connector-python[pandas]==2.2.4
 snowflake-sqlalchemy==1.2.3
